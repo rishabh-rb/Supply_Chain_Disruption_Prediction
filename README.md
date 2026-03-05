@@ -1,53 +1,203 @@
-# Supply Chain Disruption Prediction
+# Supply Chain Disruption Prediction Platform
 
-This project aims to predict disruptions in supply chains using machine learning models. It includes scripts for training the model and running a web application to interact with the predictions.
+An AI-powered system for predicting and preventing supply chain disruptions before they happen.
 
-## Features
-- Train a machine learning model to predict supply chain disruptions.
-- Serve predictions through a web application.
-- Modular and extensible codebase.
+## What This Does
 
----
+Modern supply chains are complex and vulnerable to all kinds of disruptions - supplier issues, logistics delays, geopolitical events, natural disasters, you name it. Traditional systems are reactive (they only respond after something goes wrong), but this platform is proactive. It uses machine learning to predict which suppliers and routes are at risk BEFORE disruptions occur.
 
-## Installation
+## The Problem We're Solving
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-repo/supply-chain-disruption-prediction.git
-   cd supply-chain-disruption-prediction
-   ```
+The main challenges with supply chains today:
+- No early warning system for potential disruptions  
+- Limited visibility into supplier and logistics risks
+- Can't easily simulate "what if" scenarios
+- Slow, manual mitigation planning
+- Data scattered across different systems
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+This platform brings it all together and gives you actionable intelligence.
 
-3. Ensure you have Python 3.7+ installed.
+## Key Features
 
----
+1. **Risk Prediction** - Predicts disruption probability for suppliers, routes, and products
+2. **Dashboard** - Visual overview of your entire supply chain risk profile
+3. **Scenario Analysis** - Simulate different disruption scenarios and mitigation strategies  
+4. **Recommendations** - Get specific actions to reduce risk
+5. **Batch Processing** - Analyze hundreds of suppliers at once
+6. **Model Performance Tracking** - Admin view to monitor ML model accuracy
 
-## Usage
+## How It Works
 
-### 1. Train the Model
-Run the `train_model.py` script to train the machine learning model:
+The system uses multiple machine learning models (Random Forest, Gradient Boosting, Logistic Regression) trained on 48 different features including:
+- Supplier performance metrics (on-time delivery, quality ratings, financial stability)
+- Logistics data (lead times, shipping modes, port congestion)
+- External risk factors (geopolitical risk, weather patterns)
+- Historical disruption patterns
+- Dependency relationships
+
+It picks the best performing model automatically and uses it for predictions.
+
+## Getting Started
+
+### Prerequisites
+- Python 3.8 or higher
+- pip package manager
+
+### Installation
+
+1. Clone this repo:
+```bash
+git clone https://github.com/rishabh-rb/Supply_Chain_Disruption_Prediction.git
+cd Supply_Chain_Disruption_Prediction
+```
+
+2. Create a virtual environment (recommended):
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Usage
+
+#### Step 1: Generate the Dataset
+First, create the synthetic supply chain data:
+```bash
+python generate_data.py
+```
+
+This creates a dataset with 600 records containing realistic supply chain scenarios.
+
+#### Step 2: Train the Model
+Train the machine learning models:
 ```bash
 python train_model.py
 ```
-This script will process the data, train the model, and save the trained model to a file (e.g., `model.pkl`).
 
-### 2. Run the Application
-After training the model, start the web application:
+This trains multiple models, compares them, and saves the best one. Takes about 1-2 minutes.
+
+#### Step 3: Run the Web App
+Launch the interactive platform:
 ```bash
-python app.py
+streamlit run app.py
 ```
-The application will start a web server (e.g., Flask) and provide an interface for making predictions.
+
+The app will open in your browser at `http://localhost:8501`
+
+## Using the Platform
+
+### Dashboard View
+- See overall risk metrics across your supply chain
+- Geographic risk distribution map
+- Risk breakdown by region and product category
+- Top 10 riskiest suppliers
+
+### Make Predictions View
+- **Single Prediction**: Enter details for one supplier and get instant risk assessment
+- **Batch Mode**: Upload or analyze multiple suppliers at once
+- Get specific recommendations for each high-risk supplier
+
+### Model Performance View (Admin)
+- Compare performance of different ML models
+- View confusion matrix and accuracy metrics
+- Understand which features are most important for predictions
+
+### Data Analytics View
+- Deep dive into historical trends
+- Correlation analysis between risk factors
+- Supplier and transportation mode analytics
+- Summary statistics for high vs low risk suppliers
+
+## Project Structure
+
+```
+Supply_Chain_Disruption_Prediction/
+├── app.py                      # Main Streamlit application
+├── train_model.py              # Model training script
+├── generate_data.py            # Data generation script
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
+├── data/
+│   └── supply_chain_advanced.csv  # Generated dataset
+└── model/
+    ├── supply_chain_model_advanced.pkl  # Trained model
+    ├── scaler.pkl                       # Feature scaler
+    ├── encoders.pkl                     # Categorical encoders
+    ├── feature_columns.json             # Feature names
+    └── training_metrics.json            # Model performance metrics
+```
+
+## Model Performance
+
+The system trains three different model types and automatically selects the best one:
+- **Random Forest**: Good for capturing complex non-linear relationships
+- **Gradient Boosting**: Strong predictive power, handles imbalanced data well
+- **Logistic Regression**: Fast, interpretable baseline
+
+Typical performance metrics:
+- Accuracy: 80-85%
+- F1-Score: 85-90%
+- ROC-AUC: 90-95%
+
+## Technical Details
+
+### Features Used (48 total)
+The model considers multiple dimensions:
+- **Supplier metrics**: delivery rates, quality scores, financial health
+- **Logistics**: lead times, shipping methods, customs delays
+- **Risk factors**: geopolitical, weather, demand/supply volatility
+- **Dependencies**: single-source risk, alternative suppliers available
+- **Historical**: past disruption count, average delays
+- **Financial**: annual spend, payment terms, price volatility
+
+### Target Variable
+Binary classification:
+- **1 (High Risk)**: Disruption likely based on multiple risk factors
+- **0 (Low Risk)**: Stable, low probability of disruption
+
+## Real-World Applications
+
+This type of system is valuable for:
+- **Manufacturers**: Identify supplier vulnerabilities before they cause production delays
+- **Retailers**: Ensure product availability by proactively managing supply risks
+- **Logistics Companies**: Optimize route planning based on disruption probability
+- **Supply Chain Managers**: Make data-driven decisions about supplier diversification
+
+## Future Enhancements
+
+Some ideas for extending this:
+- Real-time data integration with ERP systems
+- Reinforcement learning for automated mitigation recommendations
+- Time-series forecasting for demand prediction
+- Network graph analysis for identifying cascading risks
+- Integration with external data sources (news, weather APIs, port data)
+
+## Contributing
+
+Feel free to fork this repo and submit pull requests. Some areas that could use work:
+- Adding more sophisticated feature engineering
+- Implementing ensemble methods
+- Building API endpoints for programmatic access
+- Adding unit tests
+- Improving the UI/UX
+
+## License
+
+This project is open source and available for educational and commercial use.
+
+## Contact
+
+For questions or collaboration:
+- GitHub: [@rishabh-rb](https://github.com/rishabh-rb)
+- Repository: [Supply_Chain_Disruption_Prediction](https://github.com/rishabh-rb/Supply_Chain_Disruption_Prediction)
 
 ---
 
-## File Descriptions
-
-### `train_model.py`
-- Purpose: Trains the machine learning model using the provided dataset.
+**Note**: The dataset used in this project is synthetically generated for demonstration purposes. In a production environment, you would integrate with your actual supply chain management systems to get real-time data.
 - Key Functions:
   - Data preprocessing.
   - Model training and evaluation.
