@@ -8,7 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 # Load data
-df = pd.read_csv("../data/supply_chain.csv")
+df = pd.read_csv("data/supply_chain.csv")
 
 # -----------------------------
 # CREATE DISRUPTION LABEL
@@ -82,4 +82,4 @@ print(classification_report(y_test, y_pred))
 # -----------------------------
 # SAVE MODEL
 # -----------------------------
-joblib.dump(model, "supply_chain_model.pkl")
+joblib.dump(model, "model/supply_chain_model.pkl")
