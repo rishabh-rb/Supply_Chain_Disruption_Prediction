@@ -1,430 +1,372 @@
-# Supply Chain Disruption Prediction System
-# Built for predicting supply chain risks and disruptions
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import json
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+import json
 
-# Configure the page
+# Page config
 st.set_page_config(
-    page_title="Supply Chain Risk Platform",
-    page_icon="🏭",
+    page_title="Supply Chain Disruption Predictor",
+    page_icon="🚨",
     layout="wide"
 )
 
-# Add some custom styling
+# Custom CSS
 st.markdown("""
     <style>
-    .big-title {
-        font-size:42px !important;
+    .main-title {
+        font-size: 40px;
         font-weight: bold;
-        color: #1f77b4;
+        color: #2c3e50;
+        margin-bottom: 10px;
+    }
+    .subtitle {
+        font-size: 18px;
+        color: #7f8c8d;
+        margin-bottom: 30px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# Main title
-st.markdown('<p class="big-title">🏭 Supply Chain Disruption Prediction Platform</p>', unsafe_allow_html=True)
-st.write("Predict and prevent supply chain disruptions using machine learning")
+# Title
+st.markdown('<p class="main-title">🚨 Supply Chain Disruption Predictor</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Predict disruption risks from supply chain events</p>', unsafe_allow_html=True)
 st.markdown("---")
 
-# Load the trained model and other artifacts
+# Load model and data
 @st.cache_resource
-def load_model_stuff():
-    """Load model, scaler, encoders etc."""
-    model = joblib.load("model/supply_chain_model_advanced.pkl")
-    scaler = joblib.load("model/scaler.pkl")
-    encoders = joblib.load("model/encoders.pkl")
-    
-    with open("model/feature_columns.json", "r") as f:
-        features = json.load(f)
-    
-    with open("model/training_metrics.json", "r") as f:
-        metrics = json.load(f)
-    
-    return model, scaler, encoders, features, metrics
+def load_model_artifacts():
+    try:
+        model = joblib.load("model/disruption_model.pkl")
+        scaler = joblib.load("model/scaler.pkl")
+        encoders = joblib.load("model/encoders.pkl")
+        features = joblib.load("model/features.pkl")
+        
+        with open("model/metrics.json", "r") as f:
+            metrics = json.load(f)
+        
+        return model, scaler, encoders, features, metrics
+    except:
+        return None, None, None, None, None
 
 @st.cache_data
 def load_dataset():
-    """Load the supply chain data"""
-    return pd.read_csv("data/supply_chain_advanced.csv")
+    try:
+        return pd.read_csv("data/supply_chain_events.csv")
+    except:
+        return None
 
-# Load everything
-try:
-    model, scaler, encoders, feature_cols, train_metrics = load_model_stuff()
-    data = load_dataset()
-except Exception as e:
-    st.error(f"Error loading files: {str(e)}")
+model, scaler, encoders, features, metrics = load_model_artifacts()
+data = load_dataset()
+
+if model is None or data is None:
+    st.error("⚠️ Please run the setup first:")
+    st.code("python generate_data.py\npython train_model.py")
     st.stop()
 
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-view = st.sidebar.radio(
-    "Choose View:",
-    ["Dashboard", "Make Predictions", "Model Performance", "Data Analytics"]
+# Sidebar
+st.sidebar.title("📊 Navigation")
+page = st.sidebar.radio(
+    "Select View:",
+    ["🏠 Dashboard", "🔮 Make Prediction", "📈 Model Performance", "📊 Analytics"]
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info(f"""
+st.sidebar.markdown(f"""
 **Model Info:**
-- Type: {train_metrics['best_model']}
-- Accuracy: {train_metrics['models_performance'][train_metrics['best_model']]['accuracy']:.1%}
-- Training Date: {train_metrics['training_date'][:10]}
-- Records: {train_metrics['dataset_size']}
+- Type: {metrics['best_model']}
+- Accuracy: {metrics['models_performance'][metrics['best_model']]['accuracy']:.1%}
+- Date: {metrics['training_date'][:10]}
+- Events: {metrics['dataset_size']}
 """)
 
-# ================================================================
-# DASHBOARD VIEW
-# ================================================================
-if view == "Dashboard":
-    st.header("📊 Executive Dashboard")
-    st.write("Overview of supply chain risk across your network")
+# ==================================================
+# DASHBOARD
+# ==================================================
+if page == "🏠 Dashboard":
+    st.header("📊 Dashboard Overview")
     
-    # Show some key metrics
+    # Key metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    high_risk = (data['Disruption_Risk'] == 1).sum()
-    low_risk = (data['Disruption_Risk'] == 0).sum()
-    avg_prob = data['Disruption_Probability'].mean()
-    critical = len(data[data['Production_Dependency_Level'] == 'Critical'])
+    total_events = len(data)
+    disruptions = data['disruption'].sum()
+    non_disruptions = total_events - disruptions
+    avg_impact = data['financial_impact'].mean()
     
-    col1.metric("🚨 High Risk", high_risk, f"{high_risk/len(data)*100:.0f}%")
-    col2.metric("✅ Low Risk", low_risk, f"{low_risk/len(data)*100:.0f}%")
-    col3.metric("📊 Avg Risk Prob", f"{avg_prob:.1f}%")
-    col4.metric("⚠️ Critical Deps", critical)
+    col1.metric("Total Events", total_events)
+    col2.metric("Disruptions", disruptions, f"{disruptions/total_events*100:.0f}%")
+    col3.metric("Non-Disruptions", non_disruptions)
+    col4.metric("Avg Financial Impact", f"${avg_impact:,.0f}")
     
     st.markdown("---")
     
-    # Regional risk analysis
+    # Charts
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Risk by Region")
-        region_risk = data.groupby('Supplier_Region')['Disruption_Risk'].agg(['sum', 'count'])
-        region_risk['pct'] = (region_risk['sum'] / region_risk['count'] * 100).round(1)
-        
-        fig = px.bar(region_risk.reset_index(), 
-                     x='Supplier_Region', 
-                     y='pct',
-                     title="High Risk % by Region",
-                     labels={'pct': 'High Risk %'},
-                     color='pct',
-                     color_continuous_scale='Reds')
+        st.subheader("Events by Severity")
+        severity_counts = data['severity_level'].value_counts()
+        fig = px.pie(values=severity_counts.values, 
+                     names=severity_counts.index,
+                     title="Severity Distribution",
+                     color_discrete_sequence=px.colors.sequential.Reds_r)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.subheader("Risk by Product Category")
-        product_risk = data.groupby('Product_Category')['Disruption_Risk'].agg(['sum', 'count'])
-        product_risk['pct'] = (product_risk['sum'] / product_risk['count'] * 100).round(1)
-        
-        fig = px.bar(product_risk.reset_index(), 
-                     x='Product_Category', 
-                     y='pct',
-                     title="High Risk % by Product",
-                     labels={'pct': 'High Risk %'},
-                     color='pct',
-                     color_continuous_scale='Oranges')
+        st.subheader("Events by Type")
+        type_counts = data['event_type'].value_counts().head(8)
+        fig = px.bar(x=type_counts.index, y=type_counts.values,
+                     title="Top Event Types",
+                     labels={'x': 'Event Type', 'y': 'Count'},
+                     color=type_counts.values,
+                     color_continuous_scale='Blues')
         fig.update_xaxes(tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
-    # Top risky suppliers
-    st.subheader("🔴 Top 10 Riskiest Suppliers")
-    risky = data[data['Disruption_Risk'] == 1].nlargest(10, 'Disruption_Probability')
-    display_cols = ['Supplier_Name', 'Supplier_Country', 'Product_Category', 
-                    'Disruption_Probability', 'On_Time_Delivery_Rate', 'Financial_Stability_Score']
-    st.dataframe(risky[display_cols], use_container_width=True, hide_index=True)
+    # Top disruptions
+    st.subheader("🔴 Top 10 Costly Disruptions")
+    top_disruptions = data[data['disruption'] == 1].nlargest(10, 'financial_impact')
+    display_cols = ['event_id', 'event_date', 'event_type', 'severity_level', 
+                    'country', 'city', 'financial_impact']
+    st.dataframe(top_disruptions[display_cols], use_container_width=True, hide_index=True)
     
-    # Geographic map
+    # Geographic distribution
     st.markdown("---")
-    st.subheader("🗺️ Global Risk Map")
-    country_data = data.groupby('Supplier_Country').agg({
-        'Disruption_Risk': 'sum',
-        'Record_ID': 'count'
-    }).reset_index()
-    country_data.columns = ['Country', 'High_Risk', 'Total']
-    country_data['Risk_Pct'] = (country_data['High_Risk'] / country_data['Total'] * 100).round(1)
+    st.subheader("🗺️ Geographic Distribution")
     
-    fig = px.scatter_geo(country_data,
+    country_stats = data.groupby('country').agg({
+        'disruption': 'sum',
+        'event_id': 'count',
+        'financial_impact': 'sum'
+    }).reset_index()
+    country_stats.columns = ['Country', 'Disruptions', 'Total_Events', 'Total_Impact']
+    country_stats['Disruption_Rate'] = (country_stats['Disruptions'] / country_stats['Total_Events'] * 100).round(1)
+    
+    fig = px.scatter_geo(country_stats,
                          locations='Country',
                          locationmode='country names',
-                         size='Total',
-                         color='Risk_Pct',
+                         size='Total_Events',
+                         color='Disruption_Rate',
                          hover_name='Country',
-                         title='Supply Chain Risk by Country',
+                         hover_data={'Total_Events': True, 'Disruptions': True, 'Disruption_Rate': ':.1f'},
+                         title='Disruption Rate by Country',
                          color_continuous_scale='RdYlGn_r')
     st.plotly_chart(fig, use_container_width=True)
 
-# ================================================================
-# PREDICTION VIEW
-# ================================================================
-elif view == "Make Predictions":
+# ==================================================
+# MAKE PREDICTION
+# ==================================================
+elif page == "🔮 Make Prediction":
     st.header("🔮 Predict Disruption Risk")
-    st.write("Enter details about a supplier to predict disruption risk")
+    st.write("Enter event details to predict if it will cause a major disruption")
     
-    tab1, tab2 = st.tabs(["Single Prediction", "Batch Mode"])
+    tab1, tab2 = st.tabs(["➕ Single Prediction", "📊 Batch Analysis"])
     
     with tab1:
-        st.subheader("Enter Supplier Details")
+        st.subheader("Event Details")
         
-        # Organize inputs into columns
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**Location & Product**")
-            country = st.selectbox("Country", data['Supplier_Country'].unique())
-            region = st.selectbox("Region", data['Supplier_Region'].unique())
-            category = st.selectbox("Product Category", data['Product_Category'].unique())
-            prod_type = st.selectbox("Product Type", data['Product_Type'].unique())
-            
-        with col2:
-            st.markdown("**Operational Metrics**")
-            lead_time = st.slider("Lead Time (days)", 5, 60, 25)
-            stock = st.slider("Stock Level", 0, 5000, 1500)
-            reorder = st.slider("Reorder Point", 200, 2000, 800)
-            safety = st.slider("Safety Stock", 100, 1500, 500)
-            qty = st.slider("Order Quantity", 100, 10000, 2000)
-            
-        with col3:
-            st.markdown("**Performance**")
-            on_time = st.slider("On-Time Delivery %", 65.0, 100.0, 85.0)
-            quality = st.slider("Quality Rating %", 65.0, 100.0, 85.0)
-            defects = st.slider("Defect Rate %", 0.0, 8.0, 2.0)
-            fin_stability = st.slider("Financial Stability", 40.0, 100.0, 75.0)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("**Risk Factors**")
-            geo_risk = st.slider("Geopolitical Risk", 0.0, 10.0, 3.0)
-            weather_risk = st.slider("Weather Risk", 0.0, 10.0, 3.0)
-            demand_vol = st.slider("Demand Volatility", 0.0, 10.0, 4.0)
-            supply_vol = st.slider("Supply Volatility", 0.0, 10.0, 4.0)
-            
-        with col2:
-            st.markdown("**Logistics**")
-            transport = st.selectbox("Transport Mode", data['Transportation_Mode'].unique())
-            ship_time = st.slider("Shipping Days", 1, 45, 15)
-            customs = st.slider("Customs Days", 0, 10, 3)
-            port_cong = st.slider("Port Congestion", 0.0, 10.0, 4.0)
-            
-        with col3:
-            st.markdown("**Dependencies**")
-            single_source = st.selectbox("Single Source?", ['Yes', 'No'])
-            alt_suppliers = st.slider("Alternative Suppliers", 0, 5, 2)
-            prod_dep = st.selectbox("Production Dependency", 
-                                   ['Critical', 'High', 'Medium', 'Low'])
-            hist_disruptions = st.slider("Past Disruptions", 0, 15, 3)
-        
-        # More inputs
+        # Simple, clean input form
         col1, col2 = st.columns(2)
-        with col1:
-            inv_turnover = st.slider("Inventory Turnover", 2.0, 12.0, 6.0, 0.1)
-            responsiveness = st.slider("Responsiveness Score", 60.0, 100.0, 80.0)
-            capacity = st.slider("Capacity Utilization %", 50.0, 100.0, 75.0)
-            
-        with col2:
-            avg_delay = st.slider("Avg Delay (days)", 0.0, 20.0, 5.0, 0.5)
-            compliance = st.slider("Contract Compliance %", 70.0, 100.0, 90.0)
-            response_time = st.slider("Response Time (hrs)", 1.0, 72.0, 24.0)
         
-        col1, col2 = st.columns(2)
         with col1:
-            payment = st.selectbox("Payment Terms", [30, 45, 60, 90])
-            price_vol = st.slider("Price Volatility %", 0.0, 25.0, 5.0)
+            event_type = st.selectbox(
+                "Event Type",
+                options=sorted(data['event_type'].unique()),
+                help="Type of supply chain event"
+            )
             
-        with col2:
-            dep_score = st.slider("Dependency Score", 0.0, 10.0, 5.0)
-            impact = st.slider("Customer Impact", 0.0, 10.0, 5.0)
+            severity = st.selectbox(
+                "Severity Level",
+                options=['Low', 'Medium', 'High', 'Critical'],
+                index=1,
+                help="How severe is this event?"
+            )
+            
+            cause = st.selectbox(
+                "Root Cause",
+                options=sorted(data['cause'].unique()),
+                help="What caused this event?"
+            )
         
-        if st.button("Predict Risk", type="primary"):
-            # Prepare the input
-            input_dict = {
-                'Lead_Time_Days': lead_time,
-                'Order_Quantity': qty,
-                'Stock_Level': stock,
-                'Reorder_Point': reorder,
-                'Safety_Stock': safety,
-                'Inventory_Turnover': inv_turnover,
-                'On_Time_Delivery_Rate': on_time,
-                'Quality_Rating': quality,
-                'Defect_Rate_Percent': defects,
-                'Supplier_Responsiveness_Score': responsiveness,
-                'Supplier_Capacity_Utilization': capacity,
-                'Financial_Stability_Score': fin_stability,
-                'Shipping_Time_Days': ship_time,
-                'Customs_Clearance_Time_Days': customs,
-                'Geopolitical_Risk_Score': geo_risk,
-                'Weather_Risk_Score': weather_risk,
-                'Demand_Volatility': demand_vol,
-                'Supply_Volatility': supply_vol,
-                'Port_Congestion_Level': port_cong,
-                'Supplier_Dependency_Score': dep_score,
-                'Alternative_Suppliers_Available': alt_suppliers,
-                'Historical_Disruptions_Count': hist_disruptions,
-                'Average_Delay_Days': avg_delay,
-                'Contract_Compliance_Rate': compliance,
-                'Communication_Response_Time_Hours': response_time,
-                'Payment_Terms_Days': payment,
-                'Price_Volatility_Percent': price_vol,
-                'Customer_Impact_Score': impact,
-                'Supplier_Country_Encoded': encoders['Supplier_Country'].transform([country])[0],
-                'Supplier_Region_Encoded': encoders['Supplier_Region'].transform([region])[0],
-                'Product_Category_Encoded': encoders['Product_Category'].transform([category])[0],
-                'Product_Type_Encoded': encoders['Product_Type'].transform([prod_type])[0],
-                'Transportation_Mode_Encoded': encoders['Transportation_Mode'].transform([transport])[0],
-                'Single_Source_Risk_Encoded': encoders['Single_Source_Risk'].transform([single_source])[0],
-                'Production_Dependency_Level_Encoded': encoders['Production_Dependency_Level'].transform([prod_dep])[0]
+        with col2:
+            country = st.selectbox(
+                "Country",
+                options=sorted(data['country'].unique()),
+                help="Where did this occur?"
+            )
+            
+            financial_impact = st.number_input(
+                "Financial Impact (USD)",
+                min_value=1000,
+                max_value=500000,
+                value=50000,
+                step=5000,
+                help="Estimated financial impact in dollars"
+            )
+        
+        st.markdown("---")
+        
+        if st.button("🔮 Predict Risk", type="primary", use_container_width=True):
+            # Prepare input
+            input_data = {
+                'event_type_encoded': encoders['event_type'].transform([event_type])[0],
+                'severity_level_encoded': encoders['severity_level'].transform([severity])[0],
+                'cause_encoded': encoders['cause'].transform([cause])[0],
+                'country_encoded': encoders['country'].transform([country])[0],
+                'financial_impact': financial_impact
             }
             
-            # Create dataframe with proper order
-            input_df = pd.DataFrame([input_dict])[feature_cols]
-            
-            # Scale and predict
+            input_df = pd.DataFrame([input_data])[features]
             input_scaled = scaler.transform(input_df)
-            pred = model.predict(input_scaled)[0]
-            prob = model.predict_proba(input_scaled)[0][1]
             
-            # Show results
+            # Make prediction
+            prediction = model.predict(input_scaled)[0]
+            probability = model.predict_proba(input_scaled)[0][1]
+            
+            # Display results
             st.markdown("---")
-            st.subheader("Results")
+            st.subheader("📊 Prediction Results")
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                if pred == 1:
-                    st.error("### 🚨 HIGH RISK")
-                    st.write("**Disruption Likely**")
+                if prediction == 1:
+                    st.error("### 🚨 DISRUPTION")
+                    st.markdown("**Major disruption likely**")
                 else:
-                    st.success("### ✅ LOW RISK")
-                    st.write("**Stable Supplier**")
+                    st.success("### ✅ MANAGEABLE")
+                    st.markdown("**Event is manageable**")
             
             with col2:
-                st.metric("Probability", f"{prob*100:.1f}%")
-                
+                st.metric("Disruption Probability", f"{probability*100:.1f}%")
+            
             with col3:
-                level = "Critical" if prob > 0.8 else "High" if prob > 0.6 else "Medium" if prob > 0.4 else "Low"
-                st.metric("Risk Level", level)
+                risk_level = "Very High" if probability > 0.8 else "High" if probability > 0.6 else "Medium" if probability > 0.4 else "Low"
+                color = "🔴" if probability > 0.7 else "🟡" if probability > 0.4 else "🟢"
+                st.metric("Risk Level", f"{color} {risk_level}")
             
             # Recommendations
             st.markdown("---")
-            st.subheader("Recommendations")
+            st.subheader("💡 Recommendations")
             
-            if pred == 1:
-                recs = []
-                if stock < reorder:
-                    recs.append("🔴 **Critical**: Stock below reorder point - increase inventory now")
-                if on_time < 85:
-                    recs.append("🟠 **Important**: Poor delivery performance - find backup suppliers")
-                if fin_stability < 70:
-                    recs.append("🟠 **Monitor**: Weak financial health - review supplier viability")
-                if single_source == 'Yes':
-                    recs.append("🟡 **Suggest**: Single source risk - identify alternatives")
-                if geo_risk > 7:
-                    recs.append("🔴 **Urgent**: High geopolitical risk - diversify sourcing")
-                if lead_time > 40:
-                    recs.append("🟡 **Review**: Long lead times - explore faster options")
+            if prediction == 1:
+                st.markdown("#### ⚠️ Action Required:")
                 
-                if not recs:
-                    recs.append("👁️ Monitor closely and prepare backup plans")
+                if severity in ['High', 'Critical']:
+                    st.markdown("- 🔴 **Immediate escalation** - This is a severe event requiring senior management attention")
                 
-                for rec in recs:
-                    st.markdown(rec)
+                if financial_impact > 100000:
+                    st.markdown("- 💰 **Financial mitigation** - Consider insurance claims and budget reallocation")
+                
+                if event_type in ['Natural Disaster', 'Labor Strike', 'Port Congestion']:
+                    st.markdown("- 🔄 **Alternative routing** - Identify backup suppliers and routes immediately")
+                
+                if cause in ['Geopolitical', 'Natural Disaster']:
+                    st.markdown("- 📢 **Stakeholder communication** - Notify customers and partners proactively")
+                
+                st.markdown("- 📋 **Documentation** - Record all mitigation actions for future reference")
+                
             else:
-                st.success("✅ No immediate action needed. Continue monitoring.")
+                st.success("✅ Monitor the situation but no immediate action required")
+                st.markdown("- Continue regular monitoring schedule")
+                st.markdown("- Document event for trend analysis")
     
     with tab2:
-        st.subheader("Batch Predictions")
-        st.write("Run predictions on multiple records at once")
+        st.subheader("📊 Batch Event Analysis")
+        st.write("Analyze all historical events")
         
-        if st.button("Run Batch Prediction"):
-            with st.spinner("Processing..."):
-                # Prep data
+        if st.button("Run Batch Analysis"):
+            with st.spinner("Analyzing events..."):
+                # Prepare data
                 df_batch = data.copy()
                 
-                # Encode categorical vars
-                for col in ['Supplier_Country', 'Supplier_Region', 'Product_Category',
-                           'Product_Type', 'Transportation_Mode', 'Single_Source_Risk',
-                           'Production_Dependency_Level']:
-                    df_batch[col + '_Encoded'] = encoders[col].transform(df_batch[col])
+                X_batch = df_batch[[col for col in df_batch.columns if col + '_encoded' in features or col in features]]
                 
-                X = df_batch[feature_cols]
-                X_scaled = scaler.transform(X)
+                # Encode if needed
+                for col in ['event_type', 'severity_level', 'cause', 'country']:
+                    if col + '_encoded' not in df_batch.columns:
+                        df_batch[col + '_encoded'] = encoders[col].transform(df_batch[col])
                 
-                preds = model.predict(X_scaled)
-                probs = model.predict_proba(X_scaled)[:, 1]
+                X_features = df_batch[features]
+                X_scaled = scaler.transform(X_features)
                 
-                df_batch['Predicted_Risk'] = preds
-                df_batch['Predicted_Prob'] = (probs * 100).round(2)
+                predictions = model.predict(X_scaled)
+                probabilities = model.predict_proba(X_scaled)[:, 1]
                 
-                # Show results
-                st.success("Done!")
+                df_batch['predicted'] = predictions
+                df_batch['probability'] = (probabilities * 100).round(1)
+                
+                # Results
+                st.success("✅ Analysis complete!")
                 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Total", len(df_batch))
-                col2.metric("High Risk", (preds == 1).sum())
-                col3.metric("Low Risk", (preds == 0).sum())
+                col1.metric("Total Events", len(df_batch))
+                col2.metric("Predicted Disruptions", (predictions == 1).sum())
+                col3.metric("Model Accuracy", f"{metrics['models_performance'][metrics['best_model']]['accuracy']:.1%}")
                 
                 st.markdown("### Results")
-                results = df_batch[['Supplier_Name', 'Supplier_Country', 'Product_Category',
-                                   'Predicted_Risk', 'Predicted_Prob', 
-                                   'On_Time_Delivery_Rate', 'Financial_Stability_Score']].copy()
                 
-                results['Label'] = results['Predicted_Risk'].map({0: '✅ Low', 1: '🚨 High'})
+                risk_filter = st.multiselect(
+                    "Filter by Prediction:",
+                    options=['Disruption', 'Manageable'],
+                    default=['Disruption', 'Manageable']
+                )
                 
-                filter_risk = st.multiselect("Filter by Risk", 
-                                            options=['✅ Low', '🚨 High'],
-                                            default=['✅ Low', '🚨 High'])
+                filter_map = {'Disruption': 1, 'Manageable': 0}
+                filter_values = [filter_map[f] for f in risk_filter]
                 
-                filtered = results[results['Label'].isin(filter_risk)]
-                st.dataframe(filtered, use_container_width=True, hide_index=True)
+                filtered = df_batch[df_batch['predicted'].isin(filter_values)]
                 
-                # Download option
-                csv = filtered.to_csv(index=False)
+                display_cols = ['event_id', 'event_date', 'event_type', 'severity_level', 
+                               'country', 'financial_impact', 'probability', 'predicted']
+                
+                display_df = filtered[display_cols].copy()
+                display_df['predicted'] = display_df['predicted'].map({0: '✅ Manageable', 1: '🚨 Disruption'})
+                
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
+                
+                # Download
+                csv = display_df.to_csv(index=False)
                 st.download_button(
-                    "📥 Download CSV",
+                    "📥 Download Results",
                     csv,
                     f"predictions_{datetime.now().strftime('%Y%m%d')}.csv",
                     "text/csv"
                 )
 
-# ================================================================
-# MODEL PERFORMANCE VIEW
-# ================================================================
-elif view == "Model Performance":
-    st.header("🎯 Model Performance")
-    st.write("Detailed model evaluation metrics and analysis")
+# ==================================================
+# MODEL PERFORMANCE
+# ==================================================
+elif page == "📈 Model Performance":
+    st.header("📈 Model Performance Metrics")
     
-    # Basic info
-    st.subheader("Model Info")
+    st.subheader("Model Information")
     col1, col2, col3, col4 = st.columns(4)
-    
-    col1.metric("Model Type", train_metrics['best_model'])
-    col2.metric("Training Date", train_metrics['training_date'][:10])
-    col3.metric("Dataset Size", f"{train_metrics['dataset_size']}")
-    col4.metric("Features", train_metrics['num_features'])
+    col1.metric("Model Type", metrics['best_model'])
+    col2.metric("Training Date", metrics['training_date'][:10])
+    col3.metric("Dataset Size", metrics['dataset_size'])
+    col4.metric("Features", metrics['num_features'])
     
     st.markdown("---")
     
     # Model comparison
-    st.subheader("Model Comparison")
+    st.subheader("📊 Model Comparison")
     
-    models_df = pd.DataFrame(train_metrics['models_performance']).T
+    models_df = pd.DataFrame(metrics['models_performance']).T
     models_df = models_df[['accuracy', 'precision', 'recall', 'f1_score', 'roc_auc']]
     models_df.columns = ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']
     models_df = (models_df * 100).round(2)
     
     st.dataframe(models_df, use_container_width=True)
     
-    # Chart
+    # Bar chart
     fig = go.Figure()
-    
     for metric in ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC']:
         fig.add_trace(go.Bar(
             name=metric,
@@ -435,7 +377,7 @@ elif view == "Model Performance":
         ))
     
     fig.update_layout(
-        title="Performance Comparison",
+        title="Model Performance Comparison",
         xaxis_title="Model",
         yaxis_title="Score (%)",
         barmode='group',
@@ -447,30 +389,29 @@ elif view == "Model Performance":
     st.markdown("---")
     
     # Confusion matrix
-    st.subheader("Confusion Matrix")
+    st.subheader("🎯 Confusion Matrix")
     
-    best = train_metrics['best_model']
-    conf_mat = np.array(train_metrics['models_performance'][best]['confusion_matrix'])
+    best = metrics['best_model']
+    conf_mat = np.array(metrics['models_performance'][best]['confusion_matrix'])
     
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.markdown("### Metrics")
-        m = train_metrics['models_performance'][best]
-        st.metric("Accuracy", f"{m['accuracy']*100:.2f}%")
-        st.metric("Precision", f"{m['precision']*100:.2f}%")
-        st.metric("Recall", f"{m['recall']*100:.2f}%")
-        st.metric("F1-Score", f"{m['f1_score']*100:.2f}%")
-        st.metric("ROC-AUC", f"{m['roc_auc']*100:.2f}%")
+        st.markdown("### Key Metrics")
+        perf = metrics['models_performance'][best]
+        st.metric("Accuracy", f"{perf['accuracy']*100:.1f}%")
+        st.metric("Precision", f"{perf['precision']*100:.1f}%")
+        st.metric("Recall", f"{perf['recall']*100:.1f}%")
+        st.metric("F1-Score", f"{perf['f1_score']*100:.1f}%")
     
     with col2:
         fig = go.Figure(data=go.Heatmap(
             z=conf_mat,
-            x=['Predicted Low', 'Predicted High'],
-            y=['Actual Low', 'Actual High'],
+            x=['Predicted: Manageable', 'Predicted: Disruption'],
+            y=['Actual: Manageable', 'Actual: Disruption'],
             text=conf_mat,
             texttemplate='%{text}',
-            textfont={"size": 20},
+            textfont={"size": 18},
             colorscale='Blues'
         ))
         
@@ -480,167 +421,87 @@ elif view == "Model Performance":
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Class distribution
-    st.subheader("Data Distribution")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### Training Stats")
-        st.json({
-            "Train Size": train_metrics['train_size'],
-            "Test Size": train_metrics['test_size'],
-            "Features": train_metrics['num_features'],
-            "Model": train_metrics['best_model']
-        })
-    
-    with col2:
-        st.markdown("### Class Balance")
-        class_counts = data['Disruption_Risk'].value_counts()
-        fig = px.pie(values=class_counts.values, 
-                     names=['High Risk', 'Low Risk'],
-                     title='Target Distribution',
-                     color_discrete_map={'High Risk': 'red', 'Low Risk': 'green'})
-        st.plotly_chart(fig, use_container_width=True)
 
-# ================================================================
-# ANALYTICS VIEW
-# ================================================================
-elif view == "Data Analytics":
-    st.header("📈 Data Analytics")
-    st.write("Deep dive into supply chain risk patterns")
+# ==================================================
+# ANALYTICS
+# ==================================================
+elif page == "📊 Analytics":
+    st.header("📊 Data Analytics")
     
-    # Time trends
-    st.subheader("Risk Trends Over Time")
-    data['Date'] = pd.to_datetime(data['Date'])
-    data_sorted = data.sort_values('Date')
+    # Event trends
+    st.subheader("📅 Event Trends Over Time")
     
-    monthly = data_sorted.groupby(data_sorted['Date'].dt.to_period('M')).agg({
-        'Disruption_Risk': 'mean',
-        'Disruption_Probability': 'mean'
+    data['event_date'] = pd.to_datetime(data['event_date'])
+    monthly = data.groupby(data['event_date'].dt.to_period('M')).agg({
+        'disruption': ['sum', 'count']
     }).reset_index()
-    monthly['Date'] = monthly['Date'].astype(str)
-    monthly['Disruption_Risk'] = (monthly['Disruption_Risk'] * 100).round(2)
+    monthly.columns = ['Month', 'Disruptions', 'Total']
+    monthly['Month'] = monthly['Month'].astype(str)
+    monthly['Rate'] = (monthly['Disruptions'] / monthly['Total'] * 100).round(1)
     
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=monthly['Date'], y=monthly['Disruption_Risk'],
-                            mode='lines+markers', name='Risk Rate %',
-                            line=dict(color='red', width=3)))
-    fig.add_trace(go.Scatter(x=monthly['Date'], y=monthly['Disruption_Probability'],
-                            mode='lines+markers', name='Avg Prob %',
-                            line=dict(color='orange', width=3)))
+    fig.add_trace(go.Scatter(x=monthly['Month'], y=monthly['Total'],
+                            mode='lines+markers', name='Total Events',
+                            line=dict(color='blue', width=2)))
+    fig.add_trace(go.Scatter(x=monthly['Month'], y=monthly['Disruptions'],
+                            mode='lines+markers', name='Disruptions',
+                            line=dict(color='red', width=2)))
     
-    fig.update_layout(title='Monthly Trends', 
+    fig.update_layout(title='Monthly Event Trends', 
                      xaxis_title='Month', 
-                     yaxis_title='%',
+                     yaxis_title='Count',
                      height=400)
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
-    # Correlation heatmap
-    st.subheader("Feature Correlations")
-    
-    corr_features = [
-        'Lead_Time_Days', 'Stock_Level', 'On_Time_Delivery_Rate',
-        'Defect_Rate_Percent', 'Financial_Stability_Score',
-        'Geopolitical_Risk_Score', 'Supply_Volatility',
-        'Historical_Disruptions_Count', 'Disruption_Risk'
-    ]
-    
-    corr = data[corr_features].corr()
-    
-    fig = px.imshow(corr,
-                    labels=dict(color="Correlation"),
-                    x=corr.columns,
-                    y=corr.columns,
-                    color_continuous_scale='RdBu_r',
-                    title='Correlation Matrix')
-    
-    fig.update_layout(height=600)
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Supplier and transport analysis
+    # Risk analysis
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Top Suppliers")
-        supplier_counts = data['Supplier_Name'].value_counts().head(10)
-        fig = px.bar(x=supplier_counts.index, y=supplier_counts.values,
-                     labels={'x': 'Supplier', 'y': 'Count'},
-                     title='Top 10 Suppliers by Volume')
+        st.subheader("Risk by Country")
+        country_risk = data.groupby('country')['disruption'].mean().sort_values(ascending=False).head(10)
+        fig = px.bar(x=country_risk.index, y=country_risk.values*100,
+                     labels={'x': 'Country', 'y': 'Disruption Rate (%)'},
+                     title='Top 10 Countries by Disruption Rate',
+                     color=country_risk.values,
+                     color_continuous_scale='Reds')
         fig.update_xaxes(tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.subheader("Transport Modes")
-        transport = data['Transportation_Mode'].value_counts()
-        fig = px.pie(values=transport.values, 
-                     names=transport.index,
-                     title='Transportation Distribution')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Risk factor distributions
-    st.subheader("Risk Factors")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        fig = px.histogram(data, x='Geopolitical_Risk_Score', 
-                          color='Disruption_Risk',
-                          title='Geopolitical Risk',
-                          color_discrete_map={0: 'green', 1: 'red'})
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        fig = px.histogram(data, x='Financial_Stability_Score',
-                          color='Disruption_Risk',
-                          title='Financial Stability',
-                          color_discrete_map={0: 'green', 1: 'red'})
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col3:
-        fig = px.histogram(data, x='On_Time_Delivery_Rate',
-                          color='Disruption_Risk',
-                          title='On-Time Delivery',
-                          color_discrete_map={0: 'green', 1: 'red'})
+        st.subheader("Financial Impact by Cause")
+        cause_impact = data.groupby('cause')['financial_impact'].sum().sort_values(ascending=False).head(10)
+        fig = px.bar(x=cause_impact.index, y=cause_impact.values,
+                     labels={'x': 'Cause', 'y': 'Total Impact (USD)'},
+                     title='Top 10 Causes by Financial Impact',
+                     color=cause_impact.values,
+                     color_continuous_scale='Blues')
+        fig.update_xaxes(tickangle=-45)
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
     
     # Summary stats
-    st.subheader("Summary Statistics")
+    st.subheader("📊 Summary Statistics")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### High Risk Suppliers")
-        high_stats = data[data['Disruption_Risk'] == 1].describe()[
-            ['Lead_Time_Days', 'On_Time_Delivery_Rate', 'Defect_Rate_Percent',
-             'Financial_Stability_Score']
-        ].round(2)
-        st.dataframe(high_stats, use_container_width=True)
+        st.markdown("### Disruption Events")
+        disruption_stats = data[data['disruption'] == 1].describe()[['financial_impact']].round(0)
+        st.dataframe(disruption_stats, use_container_width=True)
     
     with col2:
-        st.markdown("### Low Risk Suppliers")
-        low_stats = data[data['Disruption_Risk'] == 0].describe()[
-            ['Lead_Time_Days', 'On_Time_Delivery_Rate', 'Defect_Rate_Percent',
-             'Financial_Stability_Score']
-        ].round(2)
-        st.dataframe(low_stats, use_container_width=True)
+        st.markdown("### Manageable Events")
+        normal_stats = data[data['disruption'] == 0].describe()[['financial_impact']].round(0)
+        st.dataframe(normal_stats, use_container_width=True)
 
 # Footer
 st.markdown("---")
 st.markdown("""
-    <div style='text-align: center; color: gray; padding: 20px;'>
+    <div style='text-align: center; color: gray; padding: 15px;'>
         <p>Supply Chain Disruption Prediction Platform</p>
-        <p>Machine Learning • Predictive Analytics • Risk Intelligence</p>
+        <p>AI-Powered Risk Intelligence System</p>
     </div>
     """, unsafe_allow_html=True)

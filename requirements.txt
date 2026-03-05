@@ -1,11 +1,4 @@
-# Core dependencies for the supply chain prediction platform
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-joblib>=1.3.0
-
-# Web interface
+pandas==3.0.0
+scikit-learn==1.8.0
+joblib==1.5.3
 streamlit>=1.28.0
-
-# Visualization
-plotly>=5.17.0
