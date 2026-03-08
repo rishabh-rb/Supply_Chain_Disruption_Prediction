@@ -19,21 +19,20 @@ This platform brings it all together and gives you actionable intelligence.
 
 ## Key Features
 
-1. **Risk Prediction** - Predicts disruption probability for suppliers, routes, and products
-2. **Dashboard** - Visual overview of your entire supply chain risk profile
-3. **Scenario Analysis** - Simulate different disruption scenarios and mitigation strategies  
-4. **Recommendations** - Get specific actions to reduce risk
-5. **Batch Processing** - Analyze hundreds of suppliers at once
-6. **Model Performance Tracking** - Admin view to monitor ML model accuracy
+1. **Risk Prediction** - Predicts disruption probability from event inputs
+2. **Dashboard** - Visual overview of event volume and disruption trends
+3. **Flask Full-Stack UI** - Multi-page web app with server-rendered HTML templates
+4. **Model Performance Tracking** - Dedicated page for accuracy and metric comparison
+5. **Analytics** - Trend and risk analysis using chart-based visualizations
 
 ## How It Works
 
-The system uses multiple machine learning models (Random Forest, Gradient Boosting, Logistic Regression) trained on 48 different features including:
-- Supplier performance metrics (on-time delivery, quality ratings, financial stability)
-- Logistics data (lead times, shipping modes, port congestion)
-- External risk factors (geopolitical risk, weather patterns)
-- Historical disruption patterns
-- Dependency relationships
+The system uses multiple machine learning models (Random Forest, Gradient Boosting, Logistic Regression) trained on an event-based dataset with the core features below:
+- Event type
+- Severity level
+- Cause
+- Country
+- Financial impact
 
 It picks the best performing model automatically and uses it for predictions.
 
@@ -70,7 +69,7 @@ First, create the synthetic supply chain data:
 python generate_data.py
 ```
 
-This creates a dataset with 600 records containing realistic supply chain scenarios.
+This creates `data/supply_chain_events.csv` with synthetic event records.
 
 #### Step 2: Train the Model
 Train the machine learning models:
@@ -81,12 +80,12 @@ python train_model.py
 This trains multiple models, compares them, and saves the best one. Takes about 1-2 minutes.
 
 #### Step 3: Run the Web App
-Launch the interactive platform:
+Launch the Flask web app:
 ```bash
-streamlit run app.py
+python app.py
 ```
 
-The app will open in your browser at `http://localhost:8501`
+The app runs at `http://127.0.0.1:5000`
 
 ## Using the Platform
 
@@ -96,10 +95,9 @@ The app will open in your browser at `http://localhost:8501`
 - Risk breakdown by region and product category
 - Top 10 riskiest suppliers
 
-### Make Predictions View
-- **Single Prediction**: Enter details for one supplier and get instant risk assessment
-- **Batch Mode**: Upload or analyze multiple suppliers at once
-- Get specific recommendations for each high-risk supplier
+### Prediction View
+- Enter event details and get instant disruption probability
+- See risk classification and recommended action level
 
 ### Model Performance View (Admin)
 - Compare performance of different ML models
@@ -116,19 +114,20 @@ The app will open in your browser at `http://localhost:8501`
 
 ```
 Supply_Chain_Disruption_Prediction/
-├── app.py                      # Main Streamlit application
+├── app.py                      # Flask application with routes
 ├── train_model.py              # Model training script
-├── generate_data.py            # Data generation script
+├── generate_data.py            # Event dataset generation
 ├── requirements.txt            # Python dependencies
-├── README.md                   # This file
+├── templates/                  # Jinja HTML templates
+├── static/                     # CSS assets
 ├── data/
-│   └── supply_chain_advanced.csv  # Generated dataset
+│   └── supply_chain_events.csv # Generated dataset
 └── model/
-    ├── supply_chain_model_advanced.pkl  # Trained model
-    ├── scaler.pkl                       # Feature scaler
-    ├── encoders.pkl                     # Categorical encoders
-    ├── feature_columns.json             # Feature names
-    └── training_metrics.json            # Model performance metrics
+  ├── disruption_model.pkl    # Best trained model
+  ├── scaler.pkl              # Feature scaler
+  ├── encoders.pkl            # Label encoders
+  ├── features.pkl            # Feature order for inference
+  └── metrics.json            # Model performance metrics
 ```
 
 ## Model Performance
@@ -145,14 +144,13 @@ Typical performance metrics:
 
 ## Technical Details
 
-### Features Used (48 total)
-The model considers multiple dimensions:
-- **Supplier metrics**: delivery rates, quality scores, financial health
-- **Logistics**: lead times, shipping methods, customs delays
-- **Risk factors**: geopolitical, weather, demand/supply volatility
-- **Dependencies**: single-source risk, alternative suppliers available
-- **Historical**: past disruption count, average delays
-- **Financial**: annual spend, payment terms, price volatility
+### Features Used
+The model uses these inference features:
+- `event_type`
+- `severity_level`
+- `cause`
+- `country`
+- `financial_impact`
 
 ### Target Variable
 Binary classification:
